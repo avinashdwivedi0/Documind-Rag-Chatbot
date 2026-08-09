@@ -1,73 +1,73 @@
-#NOTE
-create folders persisted_docs and vectorstores
+# Document Copilot
 
-# Persistent RAG Assistant
+A local-first Streamlit RAG assistant for asking grounded questions about PDF, DOCX, TXT, and CSV files. It uses FAISS for retrieval and Groq for responses.
 
-A Streamlit-based Retrieval-Augmented Generation (RAG) assistant that lets you upload documents once and query them persistently with conversational memory. Powered by LangChain, Groq LLM, and FAISS vector store.
+## Highlights
 
---- 
+- Persistent document workspaces: upload once, then reopen the indexed workspace later.
+- Named conversations with locally cached history, export, clear, and deletion controls.
+- Document-grounded response prompt that says when information is not in the uploaded files.
+- Source filename, PDF page number, and retrieval relevance shown with each live answer.
+- Cached embedding model, file-size checks, feedback storage, comfort-mode styling, and local analytics.
 
-## Features
+## Setup
 
-- Upload `.txt` or `.pdf` documents once and reuse them later
-- Vector embeddings and similarity search with FAISS
-- Conversational memory to keep context across queries
-- Integrated with Groq LLM (`llama3-8b-8192`) for responses
-- Streamlit UI with chat interface and source document references
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.8+
-- A Groq API key (sign up at [Groq](https://www.groq.com))
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/rag-assistant.git
-   cd rag-assistant
-
-Create and activate a virtual environment:
-python -m venv venv
-source venv/bin/activate   # Linux/macOS
-venv\Scripts\activate      # Windows
-
-
-venv\Scripts\activate      # Windows
-Install dependencies:
-
-bash
-Copy code
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Create a .env file in the project root with your Groq API key:
+Copy-Item .env.example .env
+```
 
-env
-Copy code
-GROQ_API_KEY=your_actual_groq_api_key_here
-Running the App
-bash
-Copy code
+Set your Groq key in `.env`:
+
+```env
+GROQ_API_KEY=your_key_here
+```
+
+Run the app:
+
+```powershell
 streamlit run main.py
-Open your browser at http://localhost:8501 to use the app.
+```
 
-Basic Usage Example
-Upload your .txt or .pdf files via the UI, then ask questions about their content in the chat box:
+## How persistence works
 
-Project Structure
-bash
-Copy code
-rag_project/
-├── backend/
-│   ├── rag_chain.py          # Defines LLM + retriever chain
-│   ├── file_handler.py       # Handles file upload, vectorstore creation/loading
-│   ├── config.py             # Directory paths and config
-├── frontend/
-│   └── ui.py                 # Streamlit UI code and interaction logic
-├── main.py                   # Entry point to launch Streamlit app
-├── requirements.txt          # Python dependencies
-└── .env                      # Environment variables (API keys, not committed)
+All generated data stays on the machine running the app:
+
+| Data | Location |
+| --- | --- |
+| Uploaded files | `data/uploads/` |
+| FAISS indexes | `data/vectors/` |
+| Workspaces and chats | `data/workspaces/`, `data/chat_history/` |
+| Answer feedback | `data/feedback.jsonl` |
+
+These paths are ignored by Git. Use **Delete workspace data** in the sidebar to remove a workspace, its files, index, and conversations.
+
+## Testing
+
+```powershell
+python -m unittest discover -s tests
+```
+
+## Evaluation regression CI
+
+A dedicated CI regression step validates the evaluation engine and compares two synthetic runs using the same evaluation logic.
+
+```powershell
+python scripts/ci_eval_regression.py
+```
+
+If the comparison gate fails, the script exits non-zero and the pipeline fails.
+
+## Project structure
+
+```text
+backend/
+  chat_history.py       # Persistent conversation cache
+  feedback_store.py     # Feedback and basic analytics
+  file_handler.py       # File loading, embeddings, FAISS index
+  rag_chain.py          # Groq conversational retrieval chain
+  workspace_store.py    # Workspace and conversation metadata
+frontend/ui.py          # Streamlit interface
+```

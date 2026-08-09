@@ -5,6 +5,11 @@ __pycache__/
 .env
 uploads/
 vectors/ 
+data/uploads/
+data/vectors/
+data/chat_history/
+data/workspaces/
+data/feedback.jsonl
 
 
 # Ignore Python cache files
