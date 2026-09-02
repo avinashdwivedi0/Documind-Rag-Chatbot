@@ -1,0 +1,126 @@
+"""Core modules for the RAG application.
+
+This package contains foundational utilities, type definitions, and exception classes
+used throughout the RAG application.
+
+Modules:
+    exceptions: Custom exception classes for error handling
+    models: Pydantic models for type safety and validation
+    config: Configuration management (future)
+    logging: Logging utilities (future)
+"""
+
+from backend.core.exceptions import (
+    APIKeyMissingException,
+    ConfigurationException,
+    DatabaseConnectionException,
+    DatabaseException,
+    DatabaseQueryException,
+    DatasetNotFoundException,
+    EvaluationException,
+    EvaluationRunException,
+    FileHandlingException,
+    FileProcessingException,
+    FileTooLargeException,
+    InvalidConfigException,
+    InvalidParameterException,
+    InvalidQueryException,
+    InvalidWorkspaceNameException,
+    LLMException,
+    LLMRateLimitException,
+    LLMTimeoutException,
+    MissingConfigException,
+    ModelUnavailableException,
+    RAGException,
+    RetrievalFailedException,
+    UnsupportedFileFormatException,
+    ValidationException,
+    VectorstoreException,
+    VectorstoreNotFoundException,
+    WorkspaceAccessException,
+    WorkspaceException,
+    WorkspaceNotFoundException,
+)
+from backend.core.models import (
+    AddCaseRequest,
+    ApplicationConfig,
+    ConversationInfo,
+    CreateWorkspaceRequest,
+    Environment,
+    ErrorDetail,
+    ErrorResponse,
+    EvaluationConfig,
+    EvaluationMetrics,
+    EvaluationResult,
+    EvaluationRunResult,
+    EvaluatorMode,
+    LLMConfig,
+    QueryRequest,
+    QueryResponse,
+    QueryTrace,
+    ResponseMode,
+    RetrievalConfig,
+    RunEvaluationRequest,
+    SourceDocument,
+    StorageConfig,
+    WorkspaceInfo,
+)
+
+__version__ = "0.1.0"
+__author__ = "RAG Project Contributors"
+
+__all__ = [
+    # Exceptions
+    "RAGException",
+    "FileHandlingException",
+    "FileTooLargeException",
+    "UnsupportedFileFormatException",
+    "FileProcessingException",
+    "LLMException",
+    "APIKeyMissingException",
+    "LLMTimeoutException",
+    "LLMRateLimitException",
+    "ModelUnavailableException",
+    "VectorstoreException",
+    "VectorstoreNotFoundException",
+    "RetrievalFailedException",
+    "WorkspaceException",
+    "WorkspaceNotFoundException",
+    "WorkspaceAccessException",
+    "InvalidWorkspaceNameException",
+    "ValidationException",
+    "InvalidQueryException",
+    "InvalidParameterException",
+    "ConfigurationException",
+    "MissingConfigException",
+    "InvalidConfigException",
+    "EvaluationException",
+    "DatasetNotFoundException",
+    "EvaluationRunException",
+    "DatabaseException",
+    "DatabaseConnectionException",
+    "DatabaseQueryException",
+    # Models
+    "ResponseMode",
+    "EvaluatorMode",
+    "Environment",
+    "QueryRequest",
+    "CreateWorkspaceRequest",
+    "AddCaseRequest",
+    "RunEvaluationRequest",
+    "SourceDocument",
+    "QueryResponse",
+    "WorkspaceInfo",
+    "ConversationInfo",
+    "EvaluationMetrics",
+    "EvaluationResult",
+    "EvaluationRunResult",
+    "LLMConfig",
+    "RetrievalConfig",
+    "EvaluationConfig",
+    "StorageConfig",
+    "ApplicationConfig",
+    "ErrorDetail",
+    "ErrorResponse",
+    "QueryTrace",
+]

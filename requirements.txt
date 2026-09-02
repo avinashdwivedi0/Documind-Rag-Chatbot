@@ -1,5 +1,6 @@
 # --- Core App Framework ---
-streamlit
+streamlit>=1.31,<2
+starlette>=0.27,<0.28
 python-dotenv
 
 # --- LangChain Ecosystem ---
@@ -22,6 +23,10 @@ python-docx
 pandas
 numpy
 
+# --- Authentication & Database ---
+pymongo
+bcrypt
+
 # --- Other Utilities ---
 groq
-requests 
+requests

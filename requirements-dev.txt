@@ -1,0 +1,88 @@
+# ============================================================================
+# Development & Testing Dependencies
+# ============================================================================
+
+# Testing & Coverage
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.1
+pytest-xdist>=3.3.1              # Parallel test execution
+factory-boy>=3.3.0               # Test data factories
+faker>=19.2.0                    # Fake data generation
+
+# Code Quality & Linting
+black>=23.7.0                    # Code formatter
+flake8>=6.0.0                    # Linter
+flake8-docstrings>=1.7.0         # Docstring linting
+isort>=5.12.0                    # Import sorting
+mypy>=1.4.0                      # Type checking
+pylint>=2.17.5                   # Advanced linting
+autopep8>=2.0.0                  # Auto-format PEP8
+
+# Documentation
+sphinx>=7.1.2                    # Documentation generator
+sphinx-rtd-theme>=1.3.0          # ReadTheDocs theme
+sphinx-autodoc-typehints>=1.23.3 # Type hints in docs
+myst-parser>=1.0.0               # Markdown support in Sphinx
+sphinx-click>=4.4.0              # Click command documentation
+
+# Development Tools
+python-dotenv>=1.0.0             # .env file support
+ipython>=8.14.0                  # Interactive shell
+ipdb>=0.13.13                    # IPython debugger
+debugpy>=1.7.0                   # Python debugger
+watchdog>=3.0.0                  # File system monitoring
+
+# Performance & Profiling
+py-spy>=0.3.14                   # Sampling profiler
+memory-profiler>=0.61.0          # Memory profiling
+line-profiler>=4.0.0             # Line-by-line profiling
+
+# Pre-commit & Git
+pre-commit>=3.3.3                # Git hooks
+commitizen>=3.5.3                # Commit message standard
+gitpython>=3.1.32                # Git library
+
+# Monitoring & Observability (Development)
+prometheus-client>=0.17.1        # Prometheus metrics
+python-json-logger>=2.0.7        # JSON logging
+
+# API Development (if building REST API)
+fastapi>=0.100.0                 # Fast web framework
+uvicorn>=0.23.0                  # ASGI server
+pydantic>=2.0.0                  # Data validation (already in core)
+pydantic-settings>=2.0.0         # Settings management
+
+# Security (Development)
+bandit>=1.7.5                    # Security issue scanner
+safety>=2.3.5                    # Dependency vulnerability checker
+
+# Database Tools (if using database)
+sqlalchemy>=2.0.0                # ORM
+alembic>=1.11.0                  # Database migrations
+psycopg2-binary>=2.9.0          # PostgreSQL adapter (optional)
+
+# Redis (for caching - optional)
+redis>=5.0.0                     # Redis client
+hiredis>=2.2.3                   # C parser for Redis
+
+# Async Support
+aiofiles>=23.1.0                 # Async file I/O
+asyncpg>=0.27.0                  # Async PostgreSQL driver (optional)
+
+# Load Testing
+locust>=2.15.1                   # Load testing framework
+
+# API Testing
+httpx>=0.24.0                    # Async HTTP client
+requests>=2.31.0                 # HTTP library
+
+# Browser Testing (if needed)
+playwright>=1.36.0               # Browser automation
+selenium>=4.10.0                 # Browser automation alternative
+
+# Additional Utilities
+rich>=13.5.0                     # Rich terminal output
+click>=8.1.6                     # CLI framework
+pyyaml>=6.0                      # YAML parsing

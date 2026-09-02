@@ -32,12 +32,21 @@ def get_workspace(workspace_id: str) -> Optional[Dict]:
         return None
 
 
-def upsert_workspace(workspace_id: str, files: Iterable, name: str = "", intelligence: Optional[Dict] = None) -> Dict:
+def upsert_workspace(
+    workspace_id: str, files: Iterable, name: str = "", intelligence: Optional[Dict] = None
+) -> Dict:
     workspace = get_workspace(workspace_id) or {
         "id": workspace_id,
         "name": name.strip() or "Untitled workspace",
         "created_at": _now(),
-        "conversations": [{"id": "default", "title": "New conversation", "created_at": _now(), "updated_at": _now()}],
+        "conversations": [
+            {
+                "id": "default",
+                "title": "New conversation",
+                "created_at": _now(),
+                "updated_at": _now(),
+            }
+        ],
     }
     if name.strip():
         workspace["name"] = name.strip()
@@ -74,7 +83,12 @@ def create_conversation(workspace_id: str, title: str = "New conversation") -> D
     if not workspace:
         raise ValueError("Workspace was not found.")
     sequence = len(workspace.get("conversations", [])) + 1
-    conversation = {"id": f"chat-{sequence}", "title": title.strip() or "New conversation", "created_at": _now(), "updated_at": _now()}
+    conversation = {
+        "id": f"chat-{sequence}",
+        "title": title.strip() or "New conversation",
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
     workspace.setdefault("conversations", []).append(conversation)
     workspace["updated_at"] = _now()
     _write(workspace)

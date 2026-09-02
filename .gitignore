@@ -1,15 +1,186 @@
+# ============================================================================
+# PYTHON & VIRTUAL ENVIRONMENTS
+# ============================================================================
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
 .venv/
+venv/
+ENV/
+env/
+.venv
+
+# ============================================================================
+# TESTING & COVERAGE
+# ============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+htmlcov/
+test-results/
+.tox/
+
+# ============================================================================
+# TYPE CHECKING & LINTING
+# ============================================================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pylint.d/
+.flake8
+
+# ============================================================================
+# IDE & EDITOR FILES
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+.sublime-project
+.sublime-workspace
+*.iml
+*.iws
+*.ipr
+.classpath
+.c9/
+*.launch
+.tern-port
+
+# ============================================================================
+# ENVIRONMENT & CONFIGURATION
+# ============================================================================
 .env
+.env.local
+.env.*.local
+.env.prod
+config.local.py
+
+# Keep example templates
+!.env.example*
+
+# ============================================================================
+# BUILD & COMPILATION
+# ============================================================================
+.eggs/
+*.egg
+*.egg-info/
+dist/
+build/
+_build/
+*.o
+*.a
+*.so
+*.dylib
+
+# ============================================================================
+# USER DATA & RUNTIME FILES (CRITICAL: DO NOT COMMIT)
+# ============================================================================
+data/
 uploads/
-vectors/ 
+vectors/
 data/uploads/
 data/vectors/
 data/chat_history/
 data/workspaces/
+data/evaluations/
 data/feedback.jsonl
+persisted_docs/
+vectorstores/
 
+# User authentication store (if using local fallback)
+data/users.json
+users.json
 
-# Ignore Python cache files
+# ============================================================================
+# TEMPORARY & LOG FILES
+# ============================================================================
+*.log
+*.pot
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+.~*
+
+# ============================================================================
+# STREAMLIT CACHE
+# ============================================================================
+.streamlit/
+streamlit_config/
+.streamlit/secrets.toml
+
+# ============================================================================
+# JUPYTER & NOTEBOOKS
+# ============================================================================
+.ipynb_checkpoints
+*.ipynb_checkpoints
+.jupyter/
+
+# ============================================================================
+# OS SPECIFIC
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ============================================================================
+# GIT & VERSION CONTROL
+# ============================================================================
+.git/
+.gitattributes
+.github/workflows/*.log
+.hg/
+.svn/
+
+# ============================================================================
+# MISC
+# ============================================================================
+*.pickle
+*.pkl
+*.pyc
+*.pyo
+.pre-commit-framework
+.pre-commit-framework/

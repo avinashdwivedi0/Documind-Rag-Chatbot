@@ -8,8 +8,17 @@ from typing import Dict
 from backend.config import FEEDBACK_FILE
 
 
-def record_feedback(workspace_id: str, conversation_id: str, question: str, answer: str, rating: str) -> None:
-    entry = {"workspace_id": workspace_id, "conversation_id": conversation_id, "question": question, "answer": answer, "rating": rating, "created_at": datetime.now(timezone.utc).isoformat()}
+def record_feedback(
+    workspace_id: str, conversation_id: str, question: str, answer: str, rating: str
+) -> None:
+    entry = {
+        "workspace_id": workspace_id,
+        "conversation_id": conversation_id,
+        "question": question,
+        "answer": answer,
+        "rating": rating,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
     with open(FEEDBACK_FILE, "a", encoding="utf-8") as file:
         file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 

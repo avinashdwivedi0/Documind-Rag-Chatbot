@@ -1,3 +1,7 @@
+"""Main Streamlit application entry point for the document intelligence workspace."""
+
+from __future__ import annotations
+
 import logging
 import os
 import shutil
@@ -42,12 +46,15 @@ from backend.workspace_store import (
     touch_conversation,
     upsert_workspace,
 )
+from frontend.auth import _logout, render_auth_screen, require_auth
+from frontend.theme import apply_theme
 
 logger = logging.getLogger(__name__)
 MAX_FILE_SIZE_MB = 25
 
 
-def _reset_runtime():
+def _reset_runtime() -> None:
+    """Clear transient runtime state while preserving saved workspace data."""
     for key in (
         "qa_chain",
         "memory",
@@ -62,7 +69,8 @@ def _reset_runtime():
         st.session_state.pop(key, None)
 
 
-def _load_conversation(workspace_id, conversation_id):
+def _load_conversation(workspace_id: str, conversation_id: str) -> None:
+    """Load an existing workspace and reconstruct the chat runtime state."""
     vectorstore = st.session_state.get("vectorstore")
     if st.session_state.get("workspace_id") != workspace_id or vectorstore is None:
         vectorstore = load_vectorstore(workspace_id)
@@ -81,7 +89,8 @@ def _load_conversation(workspace_id, conversation_id):
     st.session_state.workspace_files = [item["name"] for item in workspace.get("documents", [])]
 
 
-def _open_upload_workspace(files, name):
+def _open_upload_workspace(files, name: str) -> None:
+    """Create a brand-new workspace from uploaded files and initialize the runtime."""
     vectorstore, memory, workspace_id = load_or_create_vectorstore(files)
     intelligence = {}
     for file in files:
@@ -110,6 +119,7 @@ def _open_upload_workspace(files, name):
 
 
 def _remove_workspace(workspace_id: str) -> None:
+    """Delete all local storage for a workspace including uploaded data and indexes."""
     for path in (os.path.join(UPLOAD_DIR, workspace_id), os.path.join(VECTOR_DIR, workspace_id)):
         if os.path.isdir(path):
             shutil.rmtree(path)
@@ -120,6 +130,7 @@ def _remove_workspace(workspace_id: str) -> None:
 
 
 def _is_greeting(question: str) -> bool:
+    """Detect very short greetings as a friendly, non-document-based interaction."""
     normalized = str(question or "").strip().lower()
     if not normalized:
         return False
@@ -129,7 +140,8 @@ def _is_greeting(question: str) -> bool:
     return any(normalized.startswith(g + " ") or normalized == g for g in greetings)
 
 
-def _render_sources(source_documents, question=None):
+def _render_sources(source_documents, question=None) -> None:
+    """Render document evidence and relevance metadata in a compact panel."""
     sources = []
     if source_documents:
         sources = [
@@ -155,7 +167,8 @@ def _render_sources(source_documents, question=None):
                 )
 
 
-def _ask(question, regenerate=False):
+def _ask(question: str, regenerate: bool = False) -> None:
+    """Run a question against the active workspace and persist the chat turn."""
     workspace_id, conversation_id = st.session_state.workspace_id, st.session_state.conversation_id
     if not regenerate:
         append_turn(workspace_id, conversation_id, "user", question)
@@ -163,7 +176,10 @@ def _ask(question, regenerate=False):
             st.markdown(question)
     with st.chat_message("assistant"):
         if _is_greeting(question):
-            greeting_answer = "Hi there! I can help answer questions about the uploaded documents. Please ask a specific document-related question."
+            greeting_answer = (
+                "Hi there! I can help answer questions about the uploaded documents. "
+                "Please ask a specific document-related question."
+            )
             st.markdown(greeting_answer)
             append_turn(workspace_id, conversation_id, "assistant", greeting_answer)
             touch_conversation(workspace_id, conversation_id)
@@ -203,7 +219,11 @@ def _ask(question, regenerate=False):
                     and "I couldn't find relevant information in the uploaded documents."
                     not in answer
                 ):
-                    answer = "I found documents that may be relevant, but I cannot safely answer your question without a more specific document-based prompt. Please ask a more precise question about the uploaded documents."
+                    answer = (
+                        "I found documents that may be relevant, but I cannot safely answer "
+                        "your question without a more specific document-based prompt. "
+                        "Please ask a more precise question about the uploaded documents."
+                    )
                 st.markdown(answer)
                 _render_sources(source_documents, question)
                 append_turn(workspace_id, conversation_id, "assistant", answer)
@@ -234,7 +254,8 @@ def _ask(question, regenerate=False):
                     or "rate_limit_exceeded" in message
                 ):
                     st.error(
-                        "The request was too large for the Groq model or rate limit. Try a shorter question, fewer documents, or reduce the retrieval window."
+                        "The request was too large for the Groq model or rate limit. "
+                        "Try a shorter question, fewer documents, or reduce the retrieval window."
                     )
                 else:
                     st.error(
@@ -242,8 +263,8 @@ def _ask(question, regenerate=False):
                     )
 
 
-def _generate_insight(kind):
-    """Generate a reusable document-wide research artifact without changing chat memory."""
+def _generate_insight(kind: str) -> None:
+    """Generate a reusable research artifact from the active workspace."""
     prompts = {
         "Research brief": "Create a document-wide research brief. Include: an executive summary, the most important findings, key evidence, implications, risks, and the most useful next actions. Use only the uploaded documents for factual claims.",
         "Evidence challenge": "Act as a rigorous reviewer of these documents. Identify the strongest claims, supporting evidence, counterevidence or tensions, assumptions, and what evidence would change each conclusion. Be explicit when the documents do not provide enough evidence.",
@@ -289,11 +310,13 @@ def _generate_insight(kind):
             st.error("The insight could not be created. Check your API key and try again.")
 
 
-def _generate_comparison(document_a, document_b):
+def _generate_comparison(document_a: str, document_b: str) -> None:
+    """Compare two documents with a structured research-style summary."""
     question = (
-        f"Compare the uploaded documents '{document_a}' and '{document_b}'. Provide an executive comparison, "
-        "similarities, differences, changed facts or numbers, contradictions, risks, and a compact Markdown comparison table. "
-        "State clearly when the available evidence is insufficient."
+        f"Compare the uploaded documents '{document_a}' and '{document_b}'. Provide an "
+        "executive comparison, similarities, differences, changed facts or numbers, "
+        "contradictions, risks, and a compact Markdown comparison table. State clearly "
+        "when the available evidence is insufficient."
     )
     with st.spinner("Comparing selected documents…"):
         try:
@@ -323,11 +346,13 @@ def _generate_comparison(document_a, document_b):
             st.error("The comparison could not be generated. Check your API key and try again.")
 
 
-def _generate_document_summary(document_name):
+def _generate_document_summary(document_name: str) -> None:
+    """Create a summarization artifact for one document in the workspace."""
     prompt = (
-        f"Create a detailed structured summary of the uploaded document named '{document_name}'. Include executive summary, "
-        "key findings, important numbers if present, risks, recommendations, entities, and questions worth asking. "
-        "Only attribute facts to that document when its evidence is retrieved."
+        f"Create a detailed structured summary of the uploaded document named '{document_name}'. "
+        "Include executive summary, key findings, important numbers if present, risks, "
+        "recommendations, entities, and questions worth asking. Only attribute facts to that "
+        "document when its evidence is retrieved."
     )
     with st.spinner("Creating document summary…"):
         try:
@@ -354,18 +379,17 @@ def _generate_document_summary(document_name):
             st.error("The summary could not be generated. Check your API key and try again.")
 
 
-def _label(workspace):
+def _label(workspace: dict) -> str:
+    """Create a short, human-friendly label for a saved workspace."""
     return f"{workspace.get('name', 'Untitled workspace')} · {len(workspace.get('documents', []))} files"
 
 
-def _add_files_to_workspace(files, workspace_id, workspace_name=""):
-    """Save uploaded files into an existing workspace and rebuild its vectorstore and metadata."""
-    # Save uploaded files under the workspace upload directory
+def _add_files_to_workspace(files, workspace_id: str, workspace_name: str = "") -> bool:
+    """Save uploaded files into an existing workspace and rebuild its vector store."""
     try:
-        saved_paths = save_uploaded_files(files, workspace_id)
-    except Exception as e:
+        save_uploaded_files(files, workspace_id)
+    except Exception:
         raise
-    # Rebuild the vectorstore from all files in the workspace upload dir
     upload_dir = os.path.join(UPLOAD_DIR, workspace_id)
     all_paths = [os.path.join(upload_dir, fname) for fname in os.listdir(upload_dir)]
     raw_docs = load_documents_from_paths(all_paths)
@@ -373,7 +397,6 @@ def _add_files_to_workspace(files, workspace_id, workspace_name=""):
     index_path = os.path.join(VECTOR_DIR, workspace_id)
     embed_documents(splits, index_path)
 
-    # Extract lightweight intelligence for the newly uploaded files
     intelligence = {}
     for file in files:
         try:
@@ -387,7 +410,6 @@ def _add_files_to_workspace(files, workspace_id, workspace_name=""):
                 "entities": [],
             }
 
-    # Build a combined files iterable: include existing docs plus new uploaded Streamlit files
     workspace = get_workspace(workspace_id) or {}
     existing = [
         type("F", (), {"name": d["name"], "size": d.get("size", 0)})()
@@ -400,98 +422,64 @@ def _add_files_to_workspace(files, workspace_id, workspace_name=""):
     return True
 
 
-def _style():
-    st.markdown(
-        """<style>
-    :root {--ink:#f7f9ff;--muted:#98a7c3;--panel:#141d30;--line:#263451;--accent:#7c5cff;}
-    .stApp {background:radial-gradient(circle at 74% -8%,#28386a 0,#10182c 29%,#0b1020 60%);color:var(--ink)}
-    .block-container {max-width:1180px;padding-top:2.4rem;padding-bottom:7rem}
-    [data-testid="stSidebar"] {background:#0b1020;border-right:1px solid #263451}
-    [data-testid="stSidebar"] * {color:#f3f6fb}
-    [data-testid="stSidebar"] [data-baseweb="select"] * {color:#172033}
-    [data-testid="stHeader"] {background:rgba(0,0,0,0)}
-    h1,h2,h3,p,label,[data-testid="stMarkdownContainer"] {color:var(--ink)}
-    div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:18px;border-color:var(--line);background:rgba(20,29,48,.87);box-shadow:0 18px 50px rgba(0,0,0,.18)}
-    .eyebrow {color:#a997ff!important;font-weight:750;letter-spacing:.11em;font-size:.73rem;text-transform:uppercase}
-    .hero-copy {color:var(--muted)!important;font-size:1.08rem;line-height:1.7;max-width:660px}
-    .feature {color:var(--muted)!important;line-height:1.55;padding-bottom:.75rem}.feature b{color:var(--ink)!important}
-    .stButton>button {border-radius:10px;font-weight:700;min-height:2.7rem;border-color:#384968;background:#1b2740;color:var(--ink)}
-    .stButton>button[kind="primary"] {background:linear-gradient(135deg,#7258ff,#916cff);border-color:#8a70ff;color:white}
-    [data-testid="stChatInput"] {border-radius:14px;border-color:#344563;background:#111a2c}
-    [data-testid="stFileUploaderDropzone"] {background:#10192b;border:1px dashed #52688e;border-radius:12px}
-    [data-testid="stFileUploaderDropzone"] * {color:#d6def0}
-    [data-baseweb="input"]>div,[data-baseweb="select"]>div {background:#10192b!important;border-color:#344563!important;color:var(--ink)!important}
-    [data-testid="stMetric"] {background:rgba(20,29,48,.65);border:1px solid var(--line);border-radius:14px;padding:1rem}
-    [data-testid="stMetricLabel"] *,[data-testid="stMetricValue"] * {color:var(--ink)!important}
-    .mini-note {color:var(--muted)!important;font-size:.9rem}
-    </style>""",
-        unsafe_allow_html=True,
-    )
-
-
-def run_app():
-    ensure_dirs()
-    st.set_page_config(
-        page_title="DocuMind", page_icon="📚", layout="wide", initial_sidebar_state="expanded"
-    )
-    _style()
-    saved = list_workspaces()
-    with st.sidebar:
-        st.markdown("## ✦ DocuMind")
-        st.caption("Private document intelligence")
-        st.divider()
-        st.markdown("**WORKSPACES**")
-        if saved:
-            labels = {_label(item): item["id"] for item in saved}
-            choice = st.selectbox("Recent workspaces", list(labels), label_visibility="collapsed")
-            if st.button("Open workspace", type="primary", use_container_width=True):
-                try:
-                    _load_conversation(labels[choice], "default")
-                    st.rerun()
-                except Exception as error:
-                    st.error(f"Could not open workspace: {error}")
-            if st.button("Delete selected workspace", use_container_width=True):
-                st.session_state["confirm_delete_workspace"] = labels[choice]
-            if st.session_state.get("confirm_delete_workspace") == labels[choice]:
-                st.warning(
-                    "This will permanently remove the selected workspace and all its local files. This action cannot be undone."
-                )
-                col_confirm, col_cancel = st.columns([1, 1])
-                if col_confirm.button(
-                    "Confirm delete selected workspace",
-                    use_container_width=True,
-                    key="confirm_delete_selected",
-                ):
-                    try:
-                        _remove_workspace(labels[choice])
-                        st.session_state.pop("confirm_delete_workspace", None)
-                        _reset_runtime()
-                        st.rerun()
-                    except Exception as error:
-                        logger.exception("Workspace deletion failed")
-                        st.error(f"Could not delete workspace: {error}")
-                if col_cancel.button(
-                    "Cancel", use_container_width=True, key="cancel_delete_selected"
-                ):
-                    st.session_state.pop("confirm_delete_workspace", None)
-        else:
-            st.caption("Saved workspaces will appear here.")
-        st.divider()
-        st.markdown(
-            "<p class='mini-note'>Files, indexes, and chat history stay on this machine.</p>",
-            unsafe_allow_html=True,
-        )
-
+def _render_main_screen() -> None:
+    """Render the main workspace UI for active documents and chat."""
     workspace_id = st.session_state.get("workspace_id")
     if not workspace_id:
         st.markdown(
-            "<p class='eyebrow'>Document intelligence, without clutter</p>", unsafe_allow_html=True
+            "<div class='brand-row'><span class='brand-mark'>D</span><span class='eyebrow'>Document intelligence, without clutter</span></div>",
+            unsafe_allow_html=True,
         )
         st.title("Turn complex documents into clear answers.")
         st.markdown(
             "<p class='hero-copy'>A focused research workspace for searching reports, contracts, notes, and datasets. Every answer is grounded in your files and accompanied by source context.</p>",
             unsafe_allow_html=True,
         )
+        st.markdown(
+            "<span class='status-badge'>Local-first AI workspace</span>", unsafe_allow_html=True
+        )
+        quick = st.columns(3)
+        for column, label, value in zip(
+            quick,
+            ["Grounded answers", "Evidence tracing", "Persistent workspaces"],
+            [
+                "Answers are tied back to the files you upload.",
+                "Each response includes source snippets and relevance context.",
+                "Keep your documents, chats, and conversations organized locally.",
+            ],
+        ):
+            with column, st.container(border=True):
+                st.markdown(f"<p class='eyebrow'>{label}</p>", unsafe_allow_html=True)
+                st.caption(value)
+
+        st.markdown("<p class='eyebrow'>How it flows</p>", unsafe_allow_html=True)
+        workflow_cols = st.columns(3)
+        workflow_steps = [
+            ("1. Upload", "Drop in PDFs, tables, notes, and research files."),
+            ("2. Ask", "Search across the corpus with source-aware follow-ups."),
+            ("3. Export", "Turn the findings into a usable research brief or report."),
+        ]
+        for column, (step, text) in zip(workflow_cols, workflow_steps):
+            with column, st.container(border=True):
+                st.markdown(f"<p class='eyebrow'>{step}</p>", unsafe_allow_html=True)
+                st.caption(text)
+
+        st.markdown("<p class='eyebrow'>Popular workflows</p>", unsafe_allow_html=True)
+        prompt_cols = st.columns(3)
+        sample_prompts = [
+            "Summarize the key findings from these documents.",
+            "Compare the main arguments and contradictions across the files.",
+            "List the most important decisions or open questions in this set.",
+        ]
+        for column, prompt in zip(prompt_cols, sample_prompts):
+            with column, st.container(border=True):
+                st.caption(prompt)
+                if st.button(
+                    "Try prompt", key=f"quick-prompt-{prompt[:12]}", use_container_width=True
+                ):
+                    st.session_state["demo_prompt"] = prompt
+        if st.session_state.get("demo_prompt"):
+            st.info(f"Example prompt ready: {st.session_state['demo_prompt']}")
         create, details = st.columns([1.35, 0.85], gap="large")
         with create, st.container(border=True):
             st.subheader("Start a new workspace")
@@ -549,538 +537,7 @@ def run_app():
     conversations = workspace.get("conversations", [])
     conversation_id = st.session_state.get("conversation_id", "default")
     history = load_history(workspace_id, conversation_id)
-    # Evaluation mode shortcut — separate UI for dataset management and runs.
     if st.session_state.get("evaluation_mode"):
-
-        def _render_evaluation_ui():
-            st.title("RAG Evaluation")
-            st.caption("Create, run, and manage evaluation datasets for this workspace.")
-            dataset = load_dataset(workspace_id)
-            st.markdown(f"**Cases:** {len(dataset)}")
-            cols = st.columns([3, 1, 1])
-            with cols[0]:
-                if st.button("+ New Test Case"):
-                    st.session_state["new_case"] = True
-            with cols[1]:
-                if st.button("Import JSON"):
-                    uploaded = st.file_uploader(
-                        "Upload JSON evaluation file", type=["json"], key="import_eval"
-                    )
-                    if uploaded:
-                        try:
-                            data = json.load(uploaded)
-                            for case in data:
-                                add_case(workspace_id, case)
-                            st.success("Imported dataset")
-                            st.experimental_rerun()
-                        except Exception as e:
-                            st.error(f"Import failed: {e}")
-            with cols[2]:
-                if st.button("Export JSON"):
-                    st.download_button(
-                        "Download dataset",
-                        json.dumps(dataset, ensure_ascii=False, indent=2),
-                        file_name=f"{workspace_id}.eval.json",
-                        mime="application/json",
-                    )
-
-            if st.session_state.get("new_case"):
-                st.subheader("New evaluation case")
-                q = st.text_input("Question")
-                expected_answer = st.text_area("Expected answer (optional)")
-                expected_source = st.text_input("Expected source filename (optional)")
-                expected_pages = st.text_input("Expected pages (comma-separated, optional)")
-                if st.button("Save case"):
-                    case = {
-                        "question": q,
-                        "expected_answer": expected_answer or None,
-                        "expected_sources": [
-                            s.strip() for s in expected_source.split(",") if s.strip()
-                        ],
-                        "expected_pages": [
-                            int(p.strip()) for p in expected_pages.split(",") if p.strip().isdigit()
-                        ],
-                    }
-                    add_case(workspace_id, case)
-                    st.session_state.pop("new_case", None)
-                    st.success("Saved")
-                    st.experimental_rerun()
-
-            st.subheader("Evaluation cases")
-            if not dataset:
-                st.info("No evaluation data yet.")
-                return
-            for case in dataset:
-                with st.container(border=True):
-                    cols = st.columns([6, 1, 1])
-                    cols[0].markdown(
-                        f"**{case.get('question')}**\n\n_Source:_ {', '.join(case.get('expected_sources') or [])}"
-                    )
-                    if cols[1].button("Run", key=f"run_{case.get('id')}"):
-                        st.info("Running test...")
-                        run = run_evaluation_dataset(
-                            workspace_id,
-                            st.session_state.get("vectorstore"),
-                            st.session_state.get("qa_chain"),
-                            st.session_state.get("memory"),
-                            cases=[case],
-                        )
-                        st.json(run)
-                    if cols[2].button("Delete", key=f"del_{case.get('id')}"):
-                        delete_case(workspace_id, case.get("id"))
-                        st.experimental_rerun()
-            # Run history
-            st.subheader("Evaluation runs")
-
-            # Aggregate metrics across recent runs
-            def _aggregate_runs(runs):
-                total_cases = 0
-                total_hits = 0
-                mrr_total = 0.0
-                mrr_count = 0
-                total_retrieval_ms = 0
-                total_llm_ms = 0
-                total_runs = len(runs)
-                total_tokens = 0
-                total_cost = 0.0
-                cost_count = 0
-                for run in runs:
-                    for res in run.get("results", []):
-                        total_cases += 1
-                        metrics = res.get("metrics", {})
-                        if metrics.get("hit"):
-                            total_hits += 1
-                        if isinstance(metrics.get("mrr"), (int, float)):
-                            mrr_total += float(metrics.get("mrr"))
-                            mrr_count += 1
-                        trace = res.get("trace", {})
-                        total_retrieval_ms += int(trace.get("retrieval_ms", 0))
-                        total_llm_ms += int(trace.get("llm_ms", 0))
-                        # tokens & cost
-                        tokens = trace.get("tokens", {}) or {}
-                        t_total = tokens.get("total")
-                        if isinstance(t_total, (int, float)):
-                            total_tokens += int(t_total)
-                        cost = trace.get("cost", {}) or {}
-                        amount = cost.get("amount_usd")
-                        if isinstance(amount, (int, float)):
-                            total_cost += float(amount)
-                            cost_count += 1
-                return {
-                    "total_runs": total_runs,
-                    "total_cases": total_cases,
-                    "hit_rate": round(total_hits / total_cases, 3)
-                    if total_cases
-                    else "Not available",
-                    "mrr": round(mrr_total / mrr_count, 3) if mrr_count else "Not available",
-                    "avg_retrieval_ms": int(total_retrieval_ms / total_cases)
-                    if total_cases
-                    else "Not available",
-                    "avg_llm_ms": int(total_llm_ms / total_cases)
-                    if total_cases
-                    else "Not available",
-                    "avg_tokens": int(total_tokens / total_cases)
-                    if total_cases and total_tokens
-                    else "Not available",
-                    "avg_cost_usd": round(total_cost / cost_count, 6)
-                    if cost_count
-                    else "Not available",
-                }
-
-            runs = load_runs(workspace_id)
-            if not runs:
-                st.info("No evaluation runs yet.")
-            else:
-                agg = _aggregate_runs(runs)
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Runs", agg.get("total_runs"))
-                c2.metric("Cases", agg.get("total_cases"))
-                c3.metric("Hit Rate", agg.get("hit_rate"))
-                c4.metric("MRR", agg.get("mrr"))
-                # Export options
-                if st.button("Export runs (JSON)"):
-                    st.download_button(
-                        "Download JSON",
-                        json.dumps(runs, ensure_ascii=False, indent=2),
-                        file_name=f"{workspace_id}_runs.json",
-                        mime="application/json",
-                    )
-                if st.button("Export runs (CSV)"):
-                    # build CSV
-                    import csv
-                    import io
-
-                    out = io.StringIO()
-                    writer = csv.writer(out)
-                    writer.writerow(
-                        [
-                            "run_id",
-                            "case_id",
-                            "question",
-                            "hit",
-                            "rank",
-                            "recall@k",
-                            "precision@k",
-                            "mrr",
-                            "avg_retrieval_score",
-                            "retrieval_ms",
-                            "llm_ms",
-                            "total_ms",
-                            "tokens_total",
-                            "cost_usd",
-                            "answer_score",
-                            "answer_label",
-                            "citation_match_summary",
-                        ]
-                    )
-                    for run in runs:
-                        for res in run.get("results", []):
-                            metrics = res.get("metrics", {})
-                            trace = res.get("trace", {})
-                            ans = res.get("answer_evaluation", {})
-                            cit = res.get("citation_evaluation", {})
-                            tokens = (trace.get("tokens") or {}).get("total")
-                            cost = (trace.get("cost") or {}).get("amount_usd")
-                            writer.writerow(
-                                [
-                                    run.get("id"),
-                                    res.get("case_id"),
-                                    res.get("question"),
-                                    metrics.get("hit"),
-                                    metrics.get("rank"),
-                                    metrics.get("recall@k"),
-                                    metrics.get("precision@k"),
-                                    metrics.get("mrr"),
-                                    metrics.get("avg_retrieval_score"),
-                                    trace.get("retrieval_ms"),
-                                    trace.get("llm_ms"),
-                                    trace.get("total_ms"),
-                                    tokens if tokens is not None else "",
-                                    cost if cost is not None else "",
-                                    ans.get("score") if ans else "",
-                                    ans.get("label") if ans else "",
-                                    cit.get("overall_match_rate") if cit else "",
-                                ]
-                            )
-                    st.download_button(
-                        "Download CSV",
-                        out.getvalue(),
-                        file_name=f"{workspace_id}_runs.csv",
-                        mime="text/csv",
-                    )
-                # Charts: build a small timeseries DataFrame for recent runs
-                import altair as alt
-                import pandas as _pd
-
-                rows = []
-                for run in runs:
-                    results = run.get("results", [])
-                    if not results:
-                        continue
-                    total = len(results)
-                    hits = sum(1 for r in results if r.get("metrics", {}).get("hit"))
-                    mrrs = [
-                        r.get("metrics", {}).get("mrr")
-                        for r in results
-                        if isinstance(r.get("metrics", {}).get("mrr"), (int, float))
-                    ]
-                    traces = [r.get("trace", {}) for r in results]
-                    avg_total = (
-                        int(sum(int(t.get("total_ms", 0)) for t in traces) / total) if total else 0
-                    )
-                    avg_retrieval = (
-                        int(sum(int(t.get("retrieval_ms", 0)) for t in traces) / total)
-                        if total
-                        else 0
-                    )
-                    avg_llm = (
-                        int(sum(int(t.get("llm_ms", 0)) for t in traces) / total) if total else 0
-                    )
-                    rows.append(
-                        {
-                            "run_id": run.get("id"),
-                            "created_at": _pd.to_datetime(run.get("created_at", 0), unit="s"),
-                            "hit_rate": round(hits / total, 3) if total else None,
-                            "mrr": round(sum(mrrs) / len(mrrs), 3) if mrrs else None,
-                            "avg_total_ms": avg_total,
-                            "avg_retrieval_ms": avg_retrieval,
-                            "avg_llm_ms": avg_llm,
-                        }
-                    )
-                if rows:
-                    df = _pd.DataFrame(rows).sort_values("created_at")
-                    # keep created_at as datetime column for Altair
-                    df["created_at"] = _pd.to_datetime(df["created_at"])
-                    df["date"] = df["created_at"].dt.date
-                    min_date = df["date"].min()
-                    max_date = df["date"].max()
-                    start_date, end_date = st.date_input("Date range", value=(min_date, max_date))
-                    max_runs = st.slider(
-                        "Max runs to display", 1, max(1, len(df)), value=min(10, len(df))
-                    )
-                    mask = (df["date"] >= start_date) & (df["date"] <= end_date)
-                    df2 = df.loc[mask].sort_values("created_at").tail(max_runs)
-                    if not df2.empty:
-                        st.subheader("Performance over time")
-                        perf = df2.melt(
-                            id_vars=["created_at"],
-                            value_vars=["hit_rate", "mrr"],
-                            var_name="metric",
-                            value_name="value",
-                        )
-                        chart = (
-                            alt.Chart(perf)
-                            .mark_line(point=True)
-                            .encode(
-                                x=alt.X("created_at:T", title="Time"),
-                                y=alt.Y("value:Q", title="Value"),
-                                color="metric:N",
-                                tooltip=[
-                                    alt.Tooltip("created_at:T", title="Time"),
-                                    alt.Tooltip("metric:N"),
-                                    alt.Tooltip("value:Q"),
-                                ],
-                            )
-                            .interactive()
-                        )
-                        st.altair_chart(chart, use_container_width=True)
-
-                        st.subheader("Latency over time (ms)")
-                        lat = df2.melt(
-                            id_vars=["created_at"],
-                            value_vars=["avg_retrieval_ms", "avg_llm_ms", "avg_total_ms"],
-                            var_name="metric",
-                            value_name="value",
-                        )
-                        lat_chart = (
-                            alt.Chart(lat)
-                            .mark_line(point=True)
-                            .encode(
-                                x=alt.X("created_at:T", title="Time"),
-                                y=alt.Y("value:Q", title="Milliseconds"),
-                                color="metric:N",
-                                tooltip=[
-                                    alt.Tooltip("created_at:T", title="Time"),
-                                    alt.Tooltip("metric:N"),
-                                    alt.Tooltip("value:Q"),
-                                ],
-                            )
-                            .interactive()
-                        )
-                        st.altair_chart(lat_chart, use_container_width=True)
-
-                        st.subheader("Run drilldown")
-                        run_lookup = {row["run_id"]: row for row in rows}
-                        selected_run_id = st.selectbox(
-                            "Inspect run",
-                            list(run_lookup.keys()),
-                            format_func=lambda rid: f"{rid} ({run_lookup[rid]['created_at']:%Y-%m-%d %H:%M:%S})",
-                        )
-                        if selected_run_id:
-                            selected_run = next(
-                                (run for run in runs if run.get("id") == selected_run_id), None
-                            )
-                            if selected_run:
-                                st.markdown(f"**Selected run:** {selected_run_id}")
-                                st.caption("Inspect per-case trace details below.")
-                                for res in selected_run.get("results", []):
-                                    with st.expander(
-                                        f"Case {res.get('case_id')} — hit={res.get('metrics', {}).get('hit')}, rank={res.get('metrics', {}).get('rank')}"
-                                    ):
-                                        st.write(
-                                            {
-                                                "question": res.get("question"),
-                                                "metrics": res.get("metrics", {}),
-                                                "answer_evaluation": res.get(
-                                                    "answer_evaluation", {}
-                                                ),
-                                                "citation_evaluation": res.get(
-                                                    "citation_evaluation", {}
-                                                ),
-                                            }
-                                        )
-                                        st.markdown("#### Trace details")
-                                        trace = res.get("trace", {})
-                                        st.write(
-                                            {
-                                                "retrieval_ms": trace.get("retrieval_ms"),
-                                                "llm_ms": trace.get("llm_ms"),
-                                                "total_ms": trace.get("total_ms"),
-                                                "retrieval_top_k": trace.get("retrieval_top_k"),
-                                                "tokens": trace.get("tokens"),
-                                                "cost": trace.get("cost"),
-                                            }
-                                        )
-                # Regression comparison UI
-                st.subheader("Compare runs")
-                run_options = {f"{r.get('id')} • {r.get('created_at')}": r.get("id") for r in runs}
-                sel_a = st.selectbox("Base run (A)", list(run_options), index=0)
-                sel_b = st.selectbox(
-                    "New run (B)", list(run_options), index=min(1, len(run_options) - 1)
-                )
-                st.markdown("**Regression gate thresholds**")
-                hit_drop = st.slider(
-                    "Hit rate drop threshold (absolute)", 0.0, 0.5, 0.05, step=0.01
-                )
-                mrr_drop = st.slider("MRR drop threshold (absolute)", 0.0, 0.5, 0.05, step=0.01)
-                latency_increase = st.slider(
-                    "Latency increase threshold (fraction)", 0.0, 1.0, 0.2, step=0.05
-                )
-                if st.button("Compare selected runs"):
-                    from backend.evaluation_service import compare_runs
-
-                    try:
-                        thresholds = {
-                            "hit_drop": hit_drop,
-                            "mrr_drop": mrr_drop,
-                            "latency_increase": latency_increase,
-                        }
-                        comp = compare_runs(
-                            workspace_id,
-                            run_options[sel_a],
-                            run_options[sel_b],
-                            thresholds=thresholds,
-                        )
-                        st.markdown("**Summary**")
-                        cols = st.columns(3)
-                        cols[0].write(comp["summary_a"])
-                        cols[1].write(comp["summary_b"])
-                        cols[2].write(
-                            {
-                                "deltas": comp["deltas"],
-                                "warnings": comp["warnings"],
-                                "gate_pass": comp.get("gate_pass"),
-                            }
-                        )
-                        # Delta visualizations
-                        st.subheader("Delta charts")
-                        import csv
-                        import io
-
-                        import pandas as _p
-
-                        deltas = comp.get("deltas", {})
-                        delta_rows = [
-                            {"metric": k, "delta": (v if v is not None else 0)}
-                            for k, v in deltas.items()
-                        ]
-                        try:
-                            df_delta = _p.DataFrame(delta_rows)
-                            import altair as alt
-
-                            chart = (
-                                alt.Chart(df_delta)
-                                .mark_bar()
-                                .encode(
-                                    x=alt.X("metric:N"),
-                                    y=alt.Y("delta:Q"),
-                                    color=alt.condition(
-                                        alt.datum.delta < 0,
-                                        alt.value("#d62728"),
-                                        alt.value("#2ca02c"),
-                                    ),
-                                    tooltip=["metric", "delta"],
-                                )
-                            )
-                            st.altair_chart(chart, use_container_width=True)
-                        except Exception:
-                            pass
-
-                        # Export comparison as JSON/CSV/Markdown
-                        st.subheader("Export comparison")
-                        json_blob = json.dumps(comp, ensure_ascii=False, indent=2)
-                        st.download_button(
-                            "Download comparison (JSON)",
-                            json_blob,
-                            file_name=f'comparison_{comp["run_a"]["id"]}_{comp["run_b"]["id"]}.json',
-                            mime="application/json",
-                        )
-
-                        # CSV: per_case
-                        out = io.StringIO()
-                        writer = csv.writer(out)
-                        writer.writerow(
-                            [
-                                "case_id",
-                                "question",
-                                "a_hit",
-                                "b_hit",
-                                "delta_hit",
-                                "a_mrr",
-                                "b_mrr",
-                                "delta_mrr",
-                            ]
-                        )
-                        for row in comp.get("per_case", []):
-                            writer.writerow(
-                                [
-                                    row.get("case_id"),
-                                    row.get("question"),
-                                    row.get("a", {}).get("hit"),
-                                    row.get("b", {}).get("hit"),
-                                    row.get("delta_hit"),
-                                    row.get("a", {}).get("mrr"),
-                                    row.get("b", {}).get("mrr"),
-                                    row.get("delta_mrr"),
-                                ]
-                            )
-                        st.download_button(
-                            "Download per-case CSV",
-                            out.getvalue(),
-                            file_name=f'comparison_per_case_{comp["run_a"]["id"]}_{comp["run_b"]["id"]}.csv',
-                            mime="text/csv",
-                        )
-
-                        # Markdown summary
-                        md = []
-                        md.append(f"# Comparison {comp['run_a']['id']} → {comp['run_b']['id']}")
-                        md.append("")
-                        md.append("## Summary A")
-                        md.append(str(comp.get("summary_a")))
-                        md.append("")
-                        md.append("## Summary B")
-                        md.append(str(comp.get("summary_b")))
-                        md.append("")
-                        md.append("## Deltas")
-                        for k, v in comp.get("deltas", {}).items():
-                            md.append(f"- {k}: {v}")
-                        md.append("")
-                        if comp.get("warnings"):
-                            md.append("## Warnings")
-                            for w in comp.get("warnings"):
-                                md.append(f"- {w}")
-                        md.append("")
-                        md.append("## Per-case (first 50)")
-                        per_df = _p.DataFrame(comp["per_case"]).head(50)
-                        md.append(per_df.to_markdown(index=False))
-                        md_blob = "\n".join(md)
-                        st.download_button(
-                            "Download comparison (Markdown)",
-                            md_blob,
-                            file_name=f'comparison_{comp["run_a"]["id"]}_{comp["run_b"]["id"]}.md',
-                            mime="text/markdown",
-                        )
-
-                        st.markdown("**Per-case diffs (first 50)**")
-                        per_df = _p.DataFrame(comp["per_case"]).head(50)
-                        st.dataframe(per_df, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Comparison failed: {e}")
-
-                for run in reversed(runs[-10:]):
-                    with st.expander(f"Run {run.get('id')} • {run.get('created_at')}"):
-                        st.write(run.get("summary", {}))
-                        for res in run.get("results", []):
-                            st.markdown(
-                                f"**Q:** {res.get('question')} — **Hit:** {res.get('metrics', {}).get('hit')} • Rank: {res.get('metrics', {}).get('rank')}"
-                            )
-                            if st.button(
-                                "View trace", key=f"trace_{run.get('id')}_{res.get('case_id')}"
-                            ):
-                                st.json(res.get("trace"))
-
-        import json
-
         _render_evaluation_ui()
         return
     with st.sidebar:
@@ -1122,7 +579,6 @@ def run_app():
             rename_conversation(workspace_id, conversation_id, title)
             st.rerun()
         if st.button("Create new workspace", use_container_width=True):
-            # Drop into the new-workspace flow
             _reset_runtime()
             st.session_state.pop("workspace_id", None)
             st.rerun()
@@ -1142,7 +598,8 @@ def run_app():
             st.session_state["confirm_delete_workspace"] = workspace_id
         if st.session_state.get("confirm_delete_workspace") == workspace_id:
             st.warning(
-                "This will permanently remove the current workspace and all its local files. This action cannot be undone."
+                "This will permanently remove the current workspace and all its local files. "
+                "This action cannot be undone."
             )
             col_confirm, col_cancel = st.columns([1, 1])
             if col_confirm.button(
@@ -1164,10 +621,23 @@ def run_app():
         st.caption(f"Feedback: {summary['helpful']}/{summary['total']} helpful")
 
     st.markdown("<p class='eyebrow'>Active workspace</p>", unsafe_allow_html=True)
-    st.title(workspace.get("name", "Document workspace"))
-    st.caption(
-        f"{len(st.session_state.get('workspace_files', []))} indexed document(s) · {len(history)} saved messages · local-only storage"
-    )
+    with st.container(border=True):
+        st.title(workspace.get("name", "Document workspace"))
+        st.caption(
+            f"{len(st.session_state.get('workspace_files', []))} indexed document(s) · {len(history)} saved messages · local-only storage"
+        )
+        pills = ["Local-first", "Evidence-backed", "Private-by-default"]
+        st.markdown(
+            " ".join(f"<span class='resource-pill'>{pill}</span>" for pill in pills),
+            unsafe_allow_html=True,
+        )
+        action_left, action_mid, action_right = st.columns(3)
+        if action_left.button("Ask a question", use_container_width=True):
+            st.chat_input("Ask a question about your documents")
+        if action_mid.button("Create brief", use_container_width=True):
+            _generate_insight("Research brief")
+        if action_right.button("Compare docs", use_container_width=True):
+            st.session_state["comparison_tab_open"] = True
     workspace_documents = [item["name"] for item in workspace.get("documents", [])]
     metrics_left, metrics_middle, metrics_right = st.columns(3)
     metrics_left.metric("Documents", len(workspace_documents))
@@ -1234,7 +704,6 @@ def run_app():
                 with st.spinner("Adding files and updating workspace…"):
                     _add_files_to_workspace(add_files, workspace_id, workspace.get("name", ""))
                 st.success("Files added and workspace updated.")
-                # reload runtime state
                 _load_conversation(workspace_id, conversation_id)
                 st.rerun()
             except Exception as error:
@@ -1415,3 +884,288 @@ def run_app():
         )
     if query := st.chat_input("Ask a question about your documents"):
         _ask(query)
+
+
+def _render_evaluation_ui() -> None:
+    """Render the evaluation management and comparison console for a workspace."""
+    workspace_id = st.session_state.get("workspace_id")
+    st.title("RAG Evaluation")
+    st.caption("Create, run, and manage evaluation datasets for this workspace.")
+    dataset = load_dataset(workspace_id)
+    st.markdown(f"**Cases:** {len(dataset)}")
+    cols = st.columns([3, 1, 1])
+    with cols[0]:
+        if st.button("+ New Test Case"):
+            st.session_state["new_case"] = True
+    with cols[1]:
+        if st.button("Import JSON"):
+            uploaded = st.file_uploader(
+                "Upload JSON evaluation file", type=["json"], key="import_eval"
+            )
+            if uploaded:
+                try:
+                    data = __import__("json").load(uploaded)
+                    for case in data:
+                        add_case(workspace_id, case)
+                    st.success("Imported dataset")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Import failed: {exc}")
+    with cols[2]:
+        if st.button("Export JSON"):
+            st.download_button(
+                "Download dataset",
+                __import__("json").dumps(dataset, ensure_ascii=False, indent=2),
+                file_name=f"{workspace_id}.eval.json",
+                mime="application/json",
+            )
+
+    if st.session_state.get("new_case"):
+        st.subheader("New evaluation case")
+        q = st.text_input("Question")
+        expected_answer = st.text_area("Expected answer (optional)")
+        expected_source = st.text_input("Expected source filename (optional)")
+        expected_pages = st.text_input("Expected pages (comma-separated, optional)")
+        if st.button("Save case"):
+            case = {
+                "question": q,
+                "expected_answer": expected_answer or None,
+                "expected_sources": [s.strip() for s in expected_source.split(",") if s.strip()],
+                "expected_pages": [
+                    int(p.strip()) for p in expected_pages.split(",") if p.strip().isdigit()
+                ],
+            }
+            add_case(workspace_id, case)
+            st.session_state.pop("new_case", None)
+            st.success("Saved")
+            st.rerun()
+
+    st.subheader("Evaluation cases")
+    if not dataset:
+        st.info("No evaluation data yet.")
+        return
+    for case in dataset:
+        with st.container(border=True):
+            cols = st.columns([6, 1, 1])
+            cols[0].markdown(
+                f"**{case.get('question')}**\n\n_Source:_ {', '.join(case.get('expected_sources') or [])}"
+            )
+            if cols[1].button("Run", key=f"run_{case.get('id')}"):
+                st.info("Running test...")
+                run = run_evaluation_dataset(
+                    workspace_id,
+                    st.session_state.get("vectorstore"),
+                    st.session_state.get("qa_chain"),
+                    st.session_state.get("memory"),
+                    cases=[case],
+                )
+                st.json(run)
+            if cols[2].button("Delete", key=f"del_{case.get('id')}"):
+                delete_case(workspace_id, case.get("id"))
+                st.rerun()
+    st.subheader("Evaluation runs")
+
+    def _aggregate_runs(runs):
+        total_cases = 0
+        total_hits = 0
+        mrr_total = 0.0
+        mrr_count = 0
+        total_retrieval_ms = 0
+        total_llm_ms = 0
+        total_tokens = 0
+        total_cost = 0.0
+        cost_count = 0
+        for run in runs:
+            for res in run.get("results", []):
+                total_cases += 1
+                metrics = res.get("metrics", {})
+                if metrics.get("hit"):
+                    total_hits += 1
+                if isinstance(metrics.get("mrr"), (int, float)):
+                    mrr_total += float(metrics.get("mrr"))
+                    mrr_count += 1
+                trace = res.get("trace", {})
+                total_retrieval_ms += int(trace.get("retrieval_ms", 0))
+                total_llm_ms += int(trace.get("llm_ms", 0))
+                tokens = trace.get("tokens", {}) or {}
+                t_total = tokens.get("total")
+                if isinstance(t_total, (int, float)):
+                    total_tokens += int(t_total)
+                cost = trace.get("cost", {}) or {}
+                amount = cost.get("amount_usd")
+                if isinstance(amount, (int, float)):
+                    total_cost += float(amount)
+                    cost_count += 1
+        return {
+            "total_runs": len(runs),
+            "total_cases": total_cases,
+            "hit_rate": round(total_hits / total_cases, 3) if total_cases else "Not available",
+            "mrr": round(mrr_total / mrr_count, 3) if mrr_count else "Not available",
+            "avg_retrieval_ms": int(total_retrieval_ms / total_cases)
+            if total_cases
+            else "Not available",
+            "avg_llm_ms": int(total_llm_ms / total_cases) if total_cases else "Not available",
+            "avg_tokens": int(total_tokens / total_cases)
+            if total_cases and total_tokens
+            else "Not available",
+            "avg_cost_usd": round(total_cost / cost_count, 6) if cost_count else "Not available",
+        }
+
+    runs = load_runs(workspace_id)
+    if not runs:
+        st.info("No evaluation runs yet.")
+    else:
+        agg = _aggregate_runs(runs)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Runs", agg.get("total_runs"))
+        c2.metric("Cases", agg.get("total_cases"))
+        c3.metric("Hit Rate", agg.get("hit_rate"))
+        c4.metric("MRR", agg.get("mrr"))
+        if st.button("Export runs (JSON)"):
+            st.download_button(
+                "Download JSON",
+                __import__("json").dumps(runs, ensure_ascii=False, indent=2),
+                file_name=f"{workspace_id}_runs.json",
+                mime="application/json",
+            )
+        if st.button("Export runs (CSV)"):
+            import csv
+            import io
+
+            out = io.StringIO()
+            writer = csv.writer(out)
+            writer.writerow(
+                [
+                    "run_id",
+                    "case_id",
+                    "question",
+                    "hit",
+                    "rank",
+                    "recall@k",
+                    "precision@k",
+                    "mrr",
+                    "avg_retrieval_score",
+                    "retrieval_ms",
+                    "llm_ms",
+                    "total_ms",
+                    "tokens_total",
+                    "cost_usd",
+                    "answer_score",
+                    "answer_label",
+                    "citation_match_summary",
+                ]
+            )
+            for run in runs:
+                for res in run.get("results", []):
+                    metrics = res.get("metrics", {})
+                    trace = res.get("trace", {})
+                    ans = res.get("answer_evaluation", {})
+                    cit = res.get("citation_evaluation", {})
+                    tokens = (trace.get("tokens") or {}).get("total")
+                    cost = (trace.get("cost") or {}).get("amount_usd")
+                    writer.writerow(
+                        [
+                            run.get("id"),
+                            res.get("case_id"),
+                            res.get("question"),
+                            metrics.get("hit"),
+                            metrics.get("rank"),
+                            metrics.get("recall@k"),
+                            metrics.get("precision@k"),
+                            metrics.get("mrr"),
+                            metrics.get("avg_retrieval_score"),
+                            trace.get("retrieval_ms"),
+                            trace.get("llm_ms"),
+                            trace.get("total_ms"),
+                            tokens if tokens is not None else "",
+                            cost if cost is not None else "",
+                            ans.get("score") if ans else "",
+                            ans.get("label") if ans else "",
+                            cit.get("overall_match_rate") if cit else "",
+                        ]
+                    )
+            st.download_button(
+                "Download CSV",
+                out.getvalue(),
+                file_name=f"{workspace_id}_runs.csv",
+                mime="text/csv",
+            )
+
+
+def main() -> None:
+    """Entry point for the Streamlit dashboard."""
+    ensure_dirs()
+    st.set_page_config(
+        page_title="DocuMind",
+        page_icon="📚",
+        layout="wide",
+        initial_sidebar_state="expanded",
+        menu_items={
+            "Get Help": None,
+            "Report a bug": None,
+            "About": None,
+        },
+    )
+    apply_theme()
+
+    # Ensure auth state is checked first
+    if not require_auth():
+        render_auth_screen()
+        st.stop()
+
+    user = st.session_state.get("user") or {}
+    saved = list_workspaces()
+    with st.sidebar:
+        st.markdown("## ✦ DocuMind")
+        st.caption(f"Signed in as {user.get('name', user.get('email', 'User'))}")
+        if st.button("Logout", use_container_width=True, type="secondary"):
+            _logout()
+        st.divider()
+        st.markdown("**WORKSPACES**")
+        if saved:
+            labels = {_label(item): item["id"] for item in saved}
+            choice = st.selectbox("Recent workspaces", list(labels), label_visibility="collapsed")
+            if st.button("Open workspace", type="primary", use_container_width=True):
+                try:
+                    _load_conversation(labels[choice], "default")
+                    st.rerun()
+                except Exception as error:
+                    st.error(f"Could not open workspace: {error}")
+            if st.button("Delete selected workspace", use_container_width=True):
+                st.session_state["confirm_delete_workspace"] = labels[choice]
+            if st.session_state.get("confirm_delete_workspace") == labels[choice]:
+                st.warning(
+                    "This will permanently remove the selected workspace and all its local files. "
+                    "This action cannot be undone."
+                )
+                col_confirm, col_cancel = st.columns([1, 1])
+                if col_confirm.button(
+                    "Confirm delete selected workspace",
+                    use_container_width=True,
+                    key="confirm_delete_selected",
+                ):
+                    try:
+                        _remove_workspace(labels[choice])
+                        st.session_state.pop("confirm_delete_workspace", None)
+                        _reset_runtime()
+                        st.rerun()
+                    except Exception as error:
+                        logger.exception("Workspace deletion failed")
+                        st.error(f"Could not delete workspace: {error}")
+                if col_cancel.button(
+                    "Cancel", use_container_width=True, key="cancel_delete_selected"
+                ):
+                    st.session_state.pop("confirm_delete_workspace", None)
+        else:
+            st.caption("Saved workspaces will appear here.")
+        st.divider()
+        st.markdown(
+            "<p class='mini-note'>Files, indexes, and chat history stay on this machine.</p>",
+            unsafe_allow_html=True,
+        )
+
+    _render_main_screen()
+
+
+if __name__ == "__main__":
+    main()

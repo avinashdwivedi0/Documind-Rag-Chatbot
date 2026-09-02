@@ -25,10 +25,16 @@ class HybridRetriever(BaseRetriever):
     def _truncate_content(self, content: str) -> str:
         if content is None:
             return ""
-        return content if len(content) <= self.max_context_chars else content[: self.max_context_chars].rsplit(" ", 1)[0] + "..."
+        return (
+            content
+            if len(content) <= self.max_context_chars
+            else content[: self.max_context_chars].rsplit(" ", 1)[0] + "..."
+        )
 
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
-        semantic = self.vectorstore.similarity_search_with_relevance_scores(query, k=self.candidate_k)
+        semantic = self.vectorstore.similarity_search_with_relevance_scores(
+            query, k=self.candidate_k
+        )
         documents = list(getattr(self.vectorstore.docstore, "_dict", {}).values())
         terms = tokenize(query)
         keyword_scores = []

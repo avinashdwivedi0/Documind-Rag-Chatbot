@@ -1,6 +1,5 @@
 # main.py
-from frontend.ui import run_app
+from frontend.app import main
 
 if __name__ == "__main__":
-    run_app()
- 
+    main()
