@@ -16,8 +16,17 @@ import os
 from typing import Any, List, Tuple
 
 import streamlit as st
-from langchain.memory import ConversationBufferMemory
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+try:
+    from langchain.memory import ConversationBufferMemory
+except ImportError:  # pragma: no cover - compatibility for newer LangChain versions
+    from langchain.memory.buffer import ConversationBufferMemory
+
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except ImportError:  # pragma: no cover - compatibility for newer LangChain versions
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from langchain_community.document_loaders import (
     CSVLoader,
     PyPDFLoader,

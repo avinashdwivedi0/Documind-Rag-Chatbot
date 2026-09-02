@@ -14,7 +14,12 @@ from typing import Any, Literal, Optional
 
 import streamlit as st
 from dotenv import load_dotenv
-from langchain.chains import ConversationalRetrievalChain
+
+try:
+    from langchain.chains import ConversationalRetrievalChain
+except ImportError:  # pragma: no cover - compatibility for newer LangChain versions
+    from langchain.chains.conversational_retrieval.base import ConversationalRetrievalChain
+
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 
