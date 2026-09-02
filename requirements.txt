@@ -4,10 +4,10 @@ starlette>=0.27,<0.28
 python-dotenv
 
 # --- LangChain Ecosystem ---
-langchain
-langchain-community
-langchain-core
-langchain-groq
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.27
+langchain-groq==0.3.0
 
 # --- Embeddings & Vectorstores ---
 faiss-cpu
