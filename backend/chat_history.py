@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from typing import Dict, List
 
@@ -11,6 +12,7 @@ from backend.config import HISTORY_DIR
 
 
 def history_path(workspace_id: str, conversation_id: str = "default") -> str:
+    """Return the JSON cache path for a workspace conversation."""
     return os.path.join(HISTORY_DIR, f"{workspace_id}__{conversation_id}.json")
 
 
@@ -28,16 +30,43 @@ def load_history(workspace_id: str, conversation_id: str = "default") -> List[Di
         return []
 
 
-def save_history(workspace_id: str, messages: List[Dict[str, str]], conversation_id: str = "default") -> None:
+def save_history(
+    workspace_id: str, messages: List[Dict[str, str]], conversation_id: str = "default"
+) -> None:
     """Atomically save a workspace conversation to the local cache."""
     path = history_path(workspace_id, conversation_id)
-    temp_path = f"{path}.tmp"
-    with open(temp_path, "w", encoding="utf-8") as file:
-        json.dump(messages, file, ensure_ascii=False, indent=2)
-    os.replace(temp_path, path)
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+
+    temp_fd, temp_path = tempfile.mkstemp(
+        dir=directory,
+        prefix=f".{os.path.basename(path)}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as file:
+            json.dump(messages, file, ensure_ascii=False, indent=2)
+        os.replace(temp_path, path)
+    except PermissionError:
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(messages, file, ensure_ascii=False, indent=2)
+    except FileNotFoundError:
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(messages, file, ensure_ascii=False, indent=2)
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
 
 
 def append_turn(workspace_id: str, conversation_id: str, role: str, content: str) -> Dict[str, str]:
+    """Append a user or assistant turn and persist it to the workspace history."""
     messages = load_history(workspace_id, conversation_id)
     message = {
         "role": role,
@@ -50,6 +79,7 @@ def append_turn(workspace_id: str, conversation_id: str, role: str, content: str
 
 
 def clear_history(workspace_id: str, conversation_id: str = "default") -> None:
+    """Remove the cached conversation for a workspace if it exists."""
     try:
         os.remove(history_path(workspace_id, conversation_id))
     except FileNotFoundError:

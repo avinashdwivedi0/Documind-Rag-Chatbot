@@ -4,10 +4,12 @@ from datetime import datetime
 from typing import Dict, Iterable, List
 
 
-def build_report(workspace_name: str, messages: Iterable[Dict[str, str]], evidence: List[Dict[str, str]]) -> str:
+def build_report(
+    workspace_name: str, messages: Iterable[Dict[str, str]], evidence: List[Dict[str, str]]
+) -> str:
     lines = [
         f"# {workspace_name}",
-        "", 
+        "",
         "## Research conversation report",
         f"Generated: {datetime.now().strftime('%d %B %Y, %H:%M')}",
         "",

@@ -47,14 +47,18 @@ class CompareRunsTest(unittest.TestCase):
             "summary": {"total": 2, "passed": 1},
             "results": [
                 {"case_id": "c1", "metrics": {"hit": True, "mrr": 1.0}, "trace": {"total_ms": 110}},
-                {"case_id": "c2", "metrics": {"hit": False, "mrr": 0.0}, "trace": {"total_ms": 130}},
+                {
+                    "case_id": "c2",
+                    "metrics": {"hit": False, "mrr": 0.0},
+                    "trace": {"total_ms": 130},
+                },
             ],
         }
         _write_runs(self.tmpdir.name, workspace_id, [run_a, run_b])
         comp = es.compare_runs(workspace_id, "run-a", "run-b")
-        self.assertIn('gate_pass', comp)
-        self.assertFalse(comp['gate_pass'])
-        self.assertIn('hit_rate', comp.get('alerts', []))
+        self.assertIn("gate_pass", comp)
+        self.assertFalse(comp["gate_pass"])
+        self.assertIn("hit_rate", comp.get("alerts", []))
 
     def test_passes_with_higher_threshold(self):
         workspace_id = "ws-test-2"
@@ -75,14 +79,20 @@ class CompareRunsTest(unittest.TestCase):
             "summary": {"total": 2, "passed": 1},
             "results": [
                 {"case_id": "c1", "metrics": {"hit": True, "mrr": 1.0}, "trace": {"total_ms": 110}},
-                {"case_id": "c2", "metrics": {"hit": False, "mrr": 0.0}, "trace": {"total_ms": 130}},
+                {
+                    "case_id": "c2",
+                    "metrics": {"hit": False, "mrr": 0.0},
+                    "trace": {"total_ms": 130},
+                },
             ],
         }
         _write_runs(self.tmpdir.name, workspace_id, [run_a, run_b])
         # use a high hit_drop threshold so the small drop does not fail
-        comp = es.compare_runs(workspace_id, "run-a2", "run-b2", thresholds={"hit_drop": 0.6, "mrr_drop": 0.6})
-        self.assertTrue(comp['gate_pass'])
+        comp = es.compare_runs(
+            workspace_id, "run-a2", "run-b2", thresholds={"hit_drop": 0.6, "mrr_drop": 0.6}
+        )
+        self.assertTrue(comp["gate_pass"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

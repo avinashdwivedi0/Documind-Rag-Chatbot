@@ -1,6 +1,6 @@
+import json
 import os
 import shutil
-import json
 
 from backend import evaluation_service as es
 
@@ -25,7 +25,11 @@ def test_metrics_and_dataset(tmp_path):
     assert len(dataset) == 1
 
     # create retrieved list where Annual.pdf is rank 2
-    retrieved = [(DummyDoc("Other.pdf"), 0.9), (DummyDoc("Annual.pdf"), 0.85), (DummyDoc("Note.pdf"), 0.5)]
+    retrieved = [
+        (DummyDoc("Other.pdf"), 0.9),
+        (DummyDoc("Annual.pdf"), 0.85),
+        (DummyDoc("Note.pdf"), 0.5),
+    ]
     metrics = es.evaluate_retrieval_case(retrieved, dataset[0], k=3)
     assert metrics["hit"] is True
     assert metrics["rank"] == 2
