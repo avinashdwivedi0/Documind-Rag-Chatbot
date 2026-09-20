@@ -23,6 +23,7 @@ jobs:
     name: Code Quality Checks
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11']
 
@@ -63,6 +64,7 @@ jobs:
     name: Unit Tests (Python ${{ matrix.python-version }})
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11']
 
@@ -155,11 +157,11 @@ jobs:
 
     steps:
       - name: Check critical job status
+        shell: bash
         run: |
-          if [[ "${{ needs.tests.result }}" != "success" ]]; then
+          if [ "${{ needs.tests.result }}" != "success" ]; then
             echo "❌ Critical tests failed"
             exit 1
           else
             echo "✅ All critical checks passed"
           fi
-        shell: bash
