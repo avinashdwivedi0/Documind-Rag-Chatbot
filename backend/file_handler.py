@@ -28,7 +28,12 @@ except ImportError:  # pragma: no cover - compatibility for modern LangChain rel
         class ConversationBufferMemory:
             """Compatibility shim for LangChain versions that removed the legacy memory module."""
 
-            def __init__(self, memory_key: str = "chat_history", return_messages: bool = True, output_key: str | None = None):
+            def __init__(
+                self,
+                memory_key: str = "chat_history",
+                return_messages: bool = True,
+                output_key: str | None = None,
+            ):
                 self.memory_key = memory_key
                 self.return_messages = return_messages
                 self.output_key = output_key
@@ -48,10 +53,15 @@ except ImportError:  # pragma: no cover - compatibility for modern LangChain rel
                 messages = list(self.chat_memory.messages)
                 if self.return_messages:
                     return {self.memory_key: messages}
-                return {self.memory_key: "\n".join(getattr(message, "content", str(message)) for message in messages)}
+                return {
+                    self.memory_key: "\n".join(
+                        getattr(message, "content", str(message)) for message in messages
+                    )
+                }
 
             def clear(self) -> None:
                 self.chat_memory.clear()
+
 
 try:
     from langchain.text_splitter import RecursiveCharacterTextSplitter
