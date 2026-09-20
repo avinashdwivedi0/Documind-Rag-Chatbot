@@ -19,8 +19,39 @@ import streamlit as st
 
 try:
     from langchain.memory import ConversationBufferMemory
-except ImportError:  # pragma: no cover - compatibility for newer LangChain versions
-    from langchain.memory.buffer import ConversationBufferMemory
+except ImportError:  # pragma: no cover - compatibility for modern LangChain releases
+    try:
+        from langchain.memory.buffer import ConversationBufferMemory
+    except ImportError:  # pragma: no cover - fallback for versions without the legacy module
+        from langchain_core.chat_history import InMemoryChatMessageHistory
+
+        class ConversationBufferMemory:
+            """Compatibility shim for LangChain versions that removed the legacy memory module."""
+
+            def __init__(self, memory_key: str = "chat_history", return_messages: bool = True, output_key: str | None = None):
+                self.memory_key = memory_key
+                self.return_messages = return_messages
+                self.output_key = output_key
+                self.chat_memory = InMemoryChatMessageHistory()
+
+            def save_context(self, inputs: dict[str, Any], outputs: dict[str, Any]) -> None:
+                if "input" in inputs:
+                    self.chat_memory.add_user_message(str(inputs["input"]))
+                elif "question" in inputs:
+                    self.chat_memory.add_user_message(str(inputs["question"]))
+                if "output" in outputs:
+                    self.chat_memory.add_ai_message(str(outputs["output"]))
+                elif "answer" in outputs:
+                    self.chat_memory.add_ai_message(str(outputs["answer"]))
+
+            def load_memory_variables(self, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
+                messages = list(self.chat_memory.messages)
+                if self.return_messages:
+                    return {self.memory_key: messages}
+                return {self.memory_key: "\n".join(getattr(message, "content", str(message)) for message in messages)}
+
+            def clear(self) -> None:
+                self.chat_memory.clear()
 
 try:
     from langchain.text_splitter import RecursiveCharacterTextSplitter

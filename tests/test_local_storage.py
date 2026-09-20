@@ -1,3 +1,4 @@
+import importlib
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -42,6 +43,15 @@ class LocalStorageTests(unittest.TestCase):
         self.assertIn("# Research", report)
         self.assertIn("What changed?", report)
         self.assertIn("notes.pdf — page 2", report)
+
+    def test_legacy_langchain_memory_import_is_compatible(self):
+        import backend.file_handler as file_handler
+
+        memory = file_handler.ConversationBufferMemory(
+            memory_key="chat_history", return_messages=True, output_key="answer"
+        )
+        memory.chat_memory.add_user_message("hello")
+        self.assertEqual(memory.load_memory_variables({})["chat_history"][0].content, "hello")
 
     def test_document_intelligence_and_graph(self):
         intelligence = extract_intelligence(
