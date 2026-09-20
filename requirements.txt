@@ -4,11 +4,13 @@ starlette>=0.27,<0.28
 python-dotenv
 
 # --- LangChain Ecosystem ---
-langchain>=1.0.0,<2
-langchain-community>=0.4.0,<1
-langchain-core>=1.0.0,<2
-langchain-groq>=1.0.0,<2
-langchain-text-splitters>=1.0.0,<2
+# Pin the exact 0.1.x API family used by this repository.
+# The code imports `langchain.chains.ConversationalRetrievalChain`, which is not available in the 1.x series.
+langchain==0.1.17
+langchain-community==0.0.38
+langchain-core==0.1.53
+langchain-groq==0.1.5
+langchain-text-splitters==0.0.2
 
 # --- Embeddings & Vectorstores ---
 faiss-cpu
@@ -23,6 +25,7 @@ docx2txt
 python-docx
 pandas
 numpy
+opencv-python-headless==4.10.0.84
 
 # --- Authentication & Database ---
 pymongo
